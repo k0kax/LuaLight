@@ -61,53 +61,65 @@ func (self *reader) readBytes(n uint) []byte {
 	return bytes
 }
 
-// 从字节流中读取并检查二进制chunk头部的各个字段
+// checkHeader 读取字节码文件头并校验所有字段，不匹配则直接panic
 func (self *reader) checkHeader() {
+	// 校验魔数（是否为Lua预编译字节码）
 	if string(self.readBytes(4)) != LUA_SIGNATURE {
 		panic("not a precompiled chunk!")
+		// 校验Lua版本（如5.3=0x53）
 	} else if self.readByte() != LUAC_VERSION {
 		panic("version mismatch!")
+		// 校验字节码格式版本
 	} else if self.readByte() != LUAC_FORMAT {
 		panic("format mismatch!")
+		// 校验固定校验字节序列
 	} else if string(self.readBytes(6)) != LUAC_DATA {
 		panic("corrupted!")
+		// 校验C int类型字节数
 	} else if self.readByte() != CINT_SIZE {
 		panic("int size mismatch!")
+		// 校验C size_t类型字节数
 	} else if self.readByte() != CSIZET_SIZE {
 		panic("size_t size mismatch!")
+		// 校验字节码指令字节数
 	} else if self.readByte() != INSTRUCTION_SIZE {
 		panic("instruction size mismatch!")
+		// 校验Lua整数类型字节数
 	} else if self.readByte() != LUA_INTEGER_SIZE {
 		panic("lua_Integer size mismatch!")
+		// 校验Lua浮点类型字节数
 	} else if self.readByte() != LUA_NUMBER_SIZE {
 		panic("lua_Number size mismatch!")
+		// 校验整数解析字节序
 	} else if self.readLuaInteger() != LUAC_INT {
 		panic("endianness mismatch!")
+		// 校验浮点数解析格式
 	} else if self.readLuaNumber() != LUAC_NUM {
 		panic("float format mismatch!")
 	}
 }
 
-// 读取函数原型
+// readProto 读取单个Lua函数原型（Chunk），parentSource为父函数源文件名
 func (self *reader) readProto(parentSource string) *Prototype {
+	// 读取源文件名，空则继承父函数的源文件（子函数场景）
 	source := self.readString()
 	if source == "" {
 		source = parentSource
 	}
 	return &Prototype{
-		Source:          source,
-		LineDefined:     self.readUint32(),
-		LastLineDefined: self.readUint32(),
-		NumParams:       self.readByte(),
-		IsVararg:        self.readByte(),
-		MaxStackSize:    self.readByte(),
-		Code:            self.readCode(),
-		Constants:       self.readConstants(),
-		Upvalues:        self.readUpvalues(),
-		Protos:          self.readProtos(source),
-		LineInfo:        self.readLineInfo(),
-		LocVars:         self.readLocVars(),
-		UpvalueNames:    self.readUpvalueNames(),
+		Source:          source,                  // 函数对应的源文件名
+		LineDefined:     self.readUint32(),       // 函数定义起始行号
+		LastLineDefined: self.readUint32(),       // 函数定义结束行号
+		NumParams:       self.readByte(),         // 函数固定参数个数
+		IsVararg:        self.readByte(),         // 是否为可变参数函数（1=是，0=否）
+		MaxStackSize:    self.readByte(),         // 函数运行所需最大栈槽数
+		Code:            self.readCode(),         // 字节码指令序列
+		Constants:       self.readConstants(),    // 常量池
+		Upvalues:        self.readUpvalues(),     // Upvalue列表
+		Protos:          self.readProtos(source), // 子函数原型列表
+		LineInfo:        self.readLineInfo(),     // 指令行号映射（调试用）
+		LocVars:         self.readLocVars(),      // 局部变量表
+		UpvalueNames:    self.readUpvalueNames(), // Upvalue名称列表
 	}
 }
 
@@ -129,22 +141,23 @@ func (self *reader) readConstants() []interface{} {
 	return constants
 }
 
-// 从字节流中读一个常量
+// readConstant 读取单个Lua常量，返回对应类型的值（nil/布尔/整数/浮点数/字符串）
 func (self *reader) readConstant() interface{} {
+	// 根据常量类型标签读取对应值
 	switch self.readByte() {
-	case TAG_NIL:
+	case TAG_NIL: // 空值
 		return nil
-	case TAG_BOOLEAN:
+	case TAG_BOOLEAN: // 布尔值（1=true，0=false）
 		return self.readByte() != 0
-	case TAG_INTEGER:
+	case TAG_INTEGER: // 64位整数
 		return self.readLuaInteger()
-	case TAG_NUMBER:
+	case TAG_NUMBER: // 64位浮点数
 		return self.readLuaNumber()
-	case TAG_LONG_STR:
+	case TAG_LONG_STR: // 长字符串
 		return self.readString()
-	case TAG_SHORT_STR:
+	case TAG_SHORT_STR: // 短字符串
 		return self.readString()
-	default:
+	default: // 未知常量类型，判定字节码损坏
 		panic("corrupted!")
 	}
 }
@@ -154,8 +167,8 @@ func (self *reader) readUpvalues() []Upvalue {
 	upvalues := make([]Upvalue, self.readUint32())
 	for i := range upvalues {
 		upvalues[i] = Upvalue{
-			Instack: self.readByte(),
-			Idx:     self.readByte(),
+			Instack: self.readByte(), // 是否在栈中：1=是，0=否
+			Idx:     self.readByte(), // 栈索引/Upvalue数组索引
 		}
 	}
 	return upvalues

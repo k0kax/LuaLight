@@ -72,8 +72,10 @@ func printDetail(f *binchunk.Prototype) {
 	}
 
 	fmt.Printf("upvalues (%d):\n", len(f.Upvalues))
+
 	for i, upval := range f.Upvalues {
-		fmt.Printf("\t%d\t%s\t%d\t%d\n", i, upval.Instack, upval.Idx)
+		fmt.Printf("\t%d\t%s\t%d\t%d\n",
+			i, upvalName(f, i), upval.Instack, upval.Idx)
 	}
 }
 

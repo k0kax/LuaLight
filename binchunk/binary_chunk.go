@@ -31,32 +31,32 @@ const (
 //chunk结构
 type binaryChunk struct {
 	header                  //头部
-	sizeUpvalues byte       //主函数upvalue数量
+	sizeUpvalues byte       //主函数upvalue环境数量
 	mainFunc     *Prototype //主函数类型
 }
 
-//头部
+//头
 type header struct {
-	signature       [4]byte //签名
-	version         byte    //版本
-	format          byte    //格式号
-	luacData        [6]byte
-	cintSize        byte
-	sizetSize       byte
-	instructionSize byte
-	luaIntegerSize  byte
-	luaNumberSize   byte
-	luacInt         int64
-	luacNum         float64
+	signature       [4]byte // 魔法数，固定"\x1bLua"
+	version         byte    // Lua版本，5.3=0x53
+	format          byte    // 格式版本，固定0
+	luacData        [6]byte // 校验字节，固定"\x19\x93\r\n\x1a\n"
+	cintSize        byte    // C int字节数，64位=4
+	sizetSize       byte    // C size_t字节数，64位=8
+	instructionSize byte    // 指令字节数，固定4
+	luaIntegerSize  byte    // Lua整数字节数，固定8
+	luaNumberSize   byte    // Lua浮点数字节数，固定8
+	luacInt         int64   // 测试整数，固定0x5678
+	luacNum         float64 // 测试浮点数，固定370.5
 }
 
 //一些函数原型
 type Prototype struct {
-	Source          string        //源文件名
-	LineDefined     uint32        //函数开始行号
-	LastLineDefined uint32        //函数结束行号
-	NumParams       byte          //固定参数个数（主函数是0）
-	IsVararg        byte          //是否是可变参数函数（主函数是0）Varag
+	Source          string        // 源文件名
+	LineDefined     uint32        // 函数开始行号
+	LastLineDefined uint32        // 函数结束行号
+	NumParams       byte          // 固定参数个数（主函数是0）
+	IsVararg        byte          // 是否是可变参数函数（主函数是0）Varag
 	MaxStackSize    byte          // 函数运行需要的最大栈空间
 	Code            []uint32      // 字节码指令
 	Constants       []interface{} // 常量池
@@ -67,19 +67,20 @@ type Prototype struct {
 	UpvalueNames    []string      // Upvalue的名字
 }
 
-//Upvalue表
+//Upvalue环境表
 type Upvalue struct {
-	Instack byte
-	Idx     byte
+	Instack byte // 是否在栈中：1=是，0=否
+	Idx     byte // 栈索引/Upvalue数组索引
 }
 
 //局部变量表
 type LocVar struct {
-	VarName string //变量名
-	StartPC uint32
-	EndPC   uint32
+	VarName string // 局部变量名
+	StartPC uint32 // 变量生效起始指令位置
+	EndPC   uint32 // 变量失效结束指令位置
 }
 
+// 解析chunk
 func Undump(data []byte) *Prototype {
 	reader := &reader{data}
 	reader.checkHeader()         //校验头部
